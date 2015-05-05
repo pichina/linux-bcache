@@ -1954,7 +1954,8 @@ void bioset_exit(struct bio_set *bs)
 	mempool_exit(&bs->bvec_pool);
 
 	bioset_integrity_free(bs);
-	bio_put_slab(bs);
+	if (bs->bio_slab)
+		bio_put_slab(bs);
 	bs->bio_slab = NULL;
 }
 EXPORT_SYMBOL(bioset_exit);
