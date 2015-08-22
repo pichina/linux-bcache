@@ -688,9 +688,7 @@ static void blockdev_volume_make_request(struct request_queue *q,
 		closure_call(&s->iop.cl, bch_write, NULL, &s->cl);
 		continue_at(&s->cl, search_free, NULL);
 	} else {
-		int ret = bch_read(d->c, bio, bcache_dev_inum(d));
-
-		bio_endio(bio, ret);
+		bch_read(d->c, bio, bcache_dev_inum(d));
 	}
 }
 

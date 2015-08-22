@@ -1198,7 +1198,6 @@ static int bch_readpages(struct file *file, struct address_space *mapping,
 	struct cache_set *c = inode->i_sb->s_fs_info;
 	struct bio *bio = NULL;
 	struct page *page;
-	ssize_t ret;
 
 	pr_debug("reading %u pages", nr_pages);
 
@@ -1219,14 +1218,8 @@ again:
 			}
 
 			if (bch_bio_add_page(bio, page)) {
-				ret = bch_read(c, bio, inode->i_ino);
-				bio_endio(bio, 0);
+				bch_read(c, bio, inode->i_ino);
 				bio = NULL;
-
-				if (ret < 0) {
-					pr_debug("error %zi", ret);
-					return ret;
-				}
 				goto again;
 			}
 		}
@@ -1235,15 +1228,8 @@ again:
 		page_cache_release(page);
 	}
 
-	if (bio) {
-		ret = bch_read(c, bio, inode->i_ino);
-		bio_endio(bio, 0);
-
-		if (ret < 0) {
-			pr_debug("error %zi", ret);
-			return ret;
-		}
-	}
+	if (bio)
+		bch_read(c, bio, inode->i_ino);
 
 	pr_debug("success");
 	return 0;
@@ -1255,18 +1241,15 @@ static int bch_readpage(struct file *file, struct page *page)
 	struct inode *inode = mapping->host;
 	struct cache_set *c = inode->i_sb->s_fs_info;
 	struct bio *bio;
-	int ret;
 
 	bio = bio_alloc(GFP_NOFS, 1);
 	bio->bi_rw = READ_SYNC;
 	bio->bi_end_io = bch_readpages_end_io;
 
 	bch_bio_add_page(bio, page);
+	bch_read(c, bio, inode->i_ino);
 
-	ret = bch_read(c, bio, inode->i_ino);
-	bio_endio(bio, 0);
-
-	return ret;
+	return 0;
 }
 
 struct bch_writepage_io {
@@ -1443,7 +1426,7 @@ static int bch_read_single_page(struct page *page,
 	struct inode *inode = mapping->host;
 	struct cache_set *c = inode->i_sb->s_fs_info;
 	struct bio *bio;
-	int ret;
+	int ret = 0;
 	DECLARE_COMPLETION_ONSTACK(done);
 
 	bio = bio_alloc(GFP_NOFS, 1);
@@ -1452,8 +1435,7 @@ static int bch_read_single_page(struct page *page,
 	bio->bi_end_io = bch_read_single_page_end_io;
 	bch_bio_add_page(bio, page);
 
-	ret = bch_read(c, bio, inode->i_ino);
-	bio_endio(bio, 0);
+	bch_read(c, bio, inode->i_ino);
 	wait_for_completion(&done);
 
 	if (!bio_flagged(bio, BIO_UPTODATE))
@@ -1699,8 +1681,7 @@ start:
 		bio_set_pages_dirty(bio);
 
 		closure_get(&dio->cl);
-		ret = bch_read(c, bio, inum);
-		bio_endio(bio, ret);
+		bch_read(c, bio, inum);
 	}
 out:
 	if (is_sync_kiocb(req)) {
