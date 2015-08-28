@@ -425,6 +425,9 @@ void bdi_destroy(struct backing_dev_info *bdi)
 {
 	int i;
 
+	if (!bdi->work_list.next)
+		return;
+
 	bdi_wb_shutdown(bdi);
 	bdi_set_min_ratio(bdi, 0);
 
